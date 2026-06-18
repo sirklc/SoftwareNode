@@ -4,10 +4,10 @@
   "description": "Notion benzeri yerel masaüstü uygulaması",
   "main": "electron/main.js",
   "scripts": {
-    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron . --no-sandbox\"",
     "build": "vite build && electron-builder",
     "vite": "vite",
-    "electron": "electron ."
+    "electron": "electron . --no-sandbox"
   },
   "dependencies": {
     "@blocknote/core": "^0.15.6",
