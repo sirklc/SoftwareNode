@@ -119,9 +119,11 @@ class Sidebar(QWidget):
         menu.addAction(act_cal)
 
         if item:
+            # Capture page_id before menu.exec() — item may be deleted by Qt after that
+            captured_id = item.data(0, Qt.ItemDataRole.UserRole)
             menu.addSeparator()
-            act_rename.triggered.connect(lambda: self._rename_page(item))
-            act_delete.triggered.connect(lambda: self._delete_page(item))
+            act_rename.triggered.connect(lambda: self._rename_page(captured_id))
+            act_delete.triggered.connect(lambda: self._delete_page(captured_id))
             menu.addAction(act_rename)
             menu.addAction(act_delete)
 
@@ -138,16 +140,14 @@ class Sidebar(QWidget):
             self.refresh(select_id=pid)
             self.page_selected.emit(pid, page_type)
 
-    def _rename_page(self, item):
-        page_id = item.data(0, Qt.ItemDataRole.UserRole)
+    def _rename_page(self, page_id):
         old = get_page(page_id)["title"]
         name, ok = QInputDialog.getText(self, "Yeniden Adlandır", "Yeni ad:", text=old)
         if ok and name.strip():
             update_page(page_id, title=name.strip())
             self.refresh(select_id=page_id)
 
-    def _delete_page(self, item):
-        page_id = item.data(0, Qt.ItemDataRole.UserRole)
+    def _delete_page(self, page_id):
         page = get_page(page_id)
         reply = QMessageBox.question(
             self, "Sil",
