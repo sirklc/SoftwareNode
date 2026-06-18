@@ -1,0 +1,45 @@
+{
+  "name": "softwarenode",
+  "version": "1.0.0",
+  "description": "Notion benzeri yerel masaüstü uygulaması",
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build && electron-builder",
+    "vite": "vite",
+    "electron": "electron ."
+  },
+  "dependencies": {
+    "@blocknote/core": "^0.15.6",
+    "@blocknote/react": "^0.15.6",
+    "@blocknote/mantine": "^0.15.6",
+    "better-sqlite3": "^9.4.3",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.2",
+    "date-fns": "^3.6.0",
+    "lucide-react": "^0.378.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "autoprefixer": "^10.4.19",
+    "concurrently": "^8.2.2",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "postcss": "^8.4.38",
+    "tailwindcss": "^3.4.3",
+    "typescript": "^5.4.5",
+    "vite": "^5.2.12",
+    "wait-on": "^7.2.0"
+  },
+  "build": {
+    "appId": "com.softwarenode.app",
+    "productName": "SoftwareNode",
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
