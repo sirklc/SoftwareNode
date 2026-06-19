@@ -3,14 +3,19 @@ import { Sidebar } from './components/Sidebar'
 import { Editor } from './components/Editor'
 import { DatabaseView } from './components/DatabaseView'
 import { CalendarView } from './components/CalendarView'
+import { FinanceView } from './components/FinanceView'
+import { ContentView } from './components/ContentView'
+import { GroupView } from './components/GroupView'
 import { usePageStore } from './store/usePageStore'
 import { Page } from './types'
 
 function WelcomeScreen() {
   const { loadPages } = usePageStore()
   const addPage = async (type: string) => {
-    const icon = type === 'note' ? '📄' : type === 'database' ? '🗃️' : '📅'
-    const id = await window.api.createPage('Başlıksız', null, icon, type)
+    const iconMap: Record<string, string> = {
+      note: '📄', database: '🗃️', calendar: '📅', finance: '💰', content: '🎬', group: '📁'
+    }
+    const id = await window.api.createPage('Başlıksız', null, iconMap[type] || '📄', type)
     await loadPages()
     usePageStore.setState({ selectedPageId: id, selectedPageType: type })
   }
@@ -22,27 +27,24 @@ function WelcomeScreen() {
       </div>
       <h1 className="text-[32px] font-bold text-[#37352f]">SoftwareNode'a Hoş Geldiniz</h1>
       <p className="text-[#9b9a97] text-[15px] max-w-sm">
-        Sol panelden bir sayfa seçin ya da aşağıdan yeni bir sayfa oluşturun.
+        Sol paneldeki <strong>+</strong> butonuna tıklayarak yeni bir sayfa oluşturun.
       </p>
-      <div className="flex gap-3 mt-4">
-        <button
-          onClick={() => addPage('note')}
-          className="px-4 py-2 bg-[#37352f] text-white rounded-lg text-[14px] hover:bg-[#2f2d28] transition-colors"
-        >
-          📄 Yeni Not
-        </button>
-        <button
-          onClick={() => addPage('database')}
-          className="px-4 py-2 border border-[#e9e9e7] text-[#37352f] rounded-lg text-[14px] hover:bg-[#f1f1ef] transition-colors"
-        >
-          🗃️ Yeni Veritabanı
-        </button>
-        <button
-          onClick={() => addPage('calendar')}
-          className="px-4 py-2 border border-[#e9e9e7] text-[#37352f] rounded-lg text-[14px] hover:bg-[#f1f1ef] transition-colors"
-        >
-          📅 Yeni Takvim
-        </button>
+      <div className="flex flex-wrap gap-2 mt-2 justify-center">
+        {[
+          { type: 'note',     label: '📄 Not' },
+          { type: 'database', label: '🗃️ Veritabanı' },
+          { type: 'finance',  label: '💰 Finans' },
+          { type: 'content',  label: '🎬 İçerik' },
+          { type: 'group',    label: '📁 Grup' },
+        ].map(({ type, label }) => (
+          <button
+            key={type}
+            onClick={() => addPage(type)}
+            className="px-4 py-2 border border-[#e9e9e7] text-[#37352f] rounded-lg text-[14px] hover:bg-[#f1f1ef] transition-colors"
+          >
+            {label}
+          </button>
+        ))}
       </div>
     </div>
   )
@@ -79,16 +81,27 @@ export default function App() {
     document.removeEventListener('mouseup', onMouseUp)
   }
 
+  const renderContent = () => {
+    // Global calendar (no page needed)
+    if (selectedPageType === 'calendar' && !selectedPageId) return <CalendarView />
+    if (!currentPage) return <WelcomeScreen />
+    switch (selectedPageType) {
+      case 'database': return <DatabaseView key={currentPage.id} page={currentPage} />
+      case 'finance':  return <FinanceView  key={currentPage.id} page={currentPage} />
+      case 'content':  return <ContentView  key={currentPage.id} page={currentPage} />
+      case 'group':    return <GroupView    key={currentPage.id} page={currentPage} />
+      default:         return <Editor       key={currentPage.id} page={currentPage} />
+    }
+  }
+
   return (
     <div className="flex h-screen overflow-hidden bg-white">
-      {/* Sidebar */}
       {sidebarVisible && (
-        <div style={{ width: sidebarWidth, flexShrink: 0 }} className="flex flex-col h-full overflow-hidden">
+        <div style={{ width: sidebarWidth, flexShrink: 0 }} className="flex flex-col h-full">
           <Sidebar />
         </div>
       )}
 
-      {/* Resize handle */}
       {sidebarVisible && (
         <div
           className="w-1 cursor-col-resize bg-transparent hover:bg-[#2eaadc] transition-colors flex-shrink-0"
@@ -96,9 +109,7 @@ export default function App() {
         />
       )}
 
-      {/* Content */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        {/* Top bar */}
         <div className="h-10 flex items-center px-4 border-b border-[#e9e9e7] flex-shrink-0">
           <button
             className="w-6 h-6 flex items-center justify-center rounded hover:bg-[#efefef] text-[#9b9a97] mr-2"
@@ -117,17 +128,8 @@ export default function App() {
           )}
         </div>
 
-        {/* Page content */}
         <div className="flex-1 flex overflow-hidden">
-          {!currentPage ? (
-            <WelcomeScreen />
-          ) : selectedPageType === 'database' ? (
-            <DatabaseView key={currentPage.id} page={currentPage} />
-          ) : selectedPageType === 'calendar' ? (
-            <CalendarView key={currentPage.id} page={currentPage} />
-          ) : (
-            <Editor key={currentPage.id} page={currentPage} />
-          )}
+          {renderContent()}
         </div>
       </div>
     </div>

@@ -1,152 +1,400 @@
-const Database = require('better-sqlite3')
 const path = require('path')
 const os = require('os')
 const fs = require('fs')
 
 const DB_DIR = path.join(os.homedir(), '.softwarenode')
-const DB_PATH = path.join(DB_DIR, 'data.db')
+const DB_PATH = path.join(DB_DIR, 'data.db.json')
 
 if (!fs.existsSync(DB_DIR)) fs.mkdirSync(DB_DIR, { recursive: true })
 
-const db = new Database(DB_PATH)
-db.pragma('journal_mode = WAL')
-db.pragma('foreign_keys = ON')
+// ── In-memory store with JSON persistence ──────────────────────────────────
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS pages (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL DEFAULT 'Başlıksız',
-    parent_id INTEGER REFERENCES pages(id) ON DELETE CASCADE,
-    icon TEXT DEFAULT '📄',
-    cover TEXT DEFAULT '',
-    page_type TEXT DEFAULT 'note',
-    created_at TEXT DEFAULT (datetime('now')),
-    updated_at TEXT DEFAULT (datetime('now'))
-  );
+function loadStore() {
+  if (fs.existsSync(DB_PATH)) {
+    try { return JSON.parse(fs.readFileSync(DB_PATH, 'utf-8')) } catch {}
+  }
+  return {
+    pages: [], page_content: {}, db_columns: [], db_rows: [],
+    calendar_events: [], finance_entries: [], content_items: [], _seq: {}
+  }
+}
 
-  CREATE TABLE IF NOT EXISTS page_content (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER NOT NULL UNIQUE REFERENCES pages(id) ON DELETE CASCADE,
-    content TEXT DEFAULT '[]'
-  );
+function saveStore() {
+  fs.writeFileSync(DB_PATH, JSON.stringify(store, null, 2), 'utf-8')
+}
 
-  CREATE TABLE IF NOT EXISTS db_columns (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    name TEXT NOT NULL,
-    col_type TEXT DEFAULT 'text',
-    order_index INTEGER DEFAULT 0
-  );
+let store = loadStore()
+if (!store.finance_entries) store.finance_entries = []
+if (!store.content_items) store.content_items = []
+if (!store.sidebar_categories) store.sidebar_categories = []
 
-  CREATE TABLE IF NOT EXISTS db_rows (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    page_id INTEGER NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
-    row_data TEXT DEFAULT '{}',
-    created_at TEXT DEFAULT (datetime('now'))
-  );
-
-  CREATE TABLE IF NOT EXISTS calendar_events (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    title TEXT NOT NULL,
-    event_date TEXT NOT NULL,
-    color TEXT DEFAULT '#2eaadc',
-    note TEXT DEFAULT ''
-  );
-`)
+function nextId(table) {
+  store._seq[table] = (store._seq[table] || 0) + 1
+  return store._seq[table]
+}
 
 // ── Pages ──────────────────────────────────────────────────────────────────
 
-const getPages = (parentId = null) => {
-  if (parentId === null) {
-    return db.prepare('SELECT * FROM pages WHERE parent_id IS NULL ORDER BY id').all()
+function getPages(parentId = null) {
+  return store.pages
+    .filter(p => parentId === null ? p.parent_id === null : p.parent_id === parentId)
+    .sort((a, b) => a.id - b.id)
+}
+
+function getAllPages() {
+  return store.pages
+    .map(p => ({ category_id: null, order_index: p.id, ...p }))
+    .sort((a, b) => a.order_index - b.order_index)
+}
+
+function getPage(id) {
+  return store.pages.find(p => p.id === id) || null
+}
+
+function createPage(title = 'Başlıksız', parentId = null, icon = '📄', pageType = 'note', categoryId = null) {
+  const page = {
+    id: nextId('pages'),
+    title,
+    parent_id: parentId,
+    category_id: parentId ? null : categoryId, // only root pages have categories
+    icon,
+    cover: '',
+    page_type: pageType,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
   }
-  return db.prepare('SELECT * FROM pages WHERE parent_id = ? ORDER BY id').all(parentId)
+  store.pages.push(page)
+  saveStore()
+  return page.id
 }
 
-const getAllPages = () => db.prepare('SELECT * FROM pages ORDER BY id').all()
-
-const getPage = (id) => db.prepare('SELECT * FROM pages WHERE id = ?').get(id)
-
-const createPage = (title = 'Başlıksız', parentId = null, icon = '📄', pageType = 'note') => {
-  const result = db.prepare(
-    'INSERT INTO pages (title, parent_id, icon, page_type) VALUES (?, ?, ?, ?)'
-  ).run(title, parentId, icon, pageType)
-  return result.lastInsertRowid
+function updatePage(id, fields) {
+  const page = store.pages.find(p => p.id === id)
+  if (!page) return
+  Object.assign(page, fields, { updated_at: new Date().toISOString() })
+  saveStore()
 }
 
-const updatePage = (id, fields) => {
-  fields.updated_at = new Date().toISOString()
-  const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ')
-  db.prepare(`UPDATE pages SET ${sets} WHERE id = ?`).run(...Object.values(fields), id)
-}
+function deletePage(id) {
+  const children = store.pages.filter(p => p.parent_id === id).map(p => p.id)
+  children.forEach(cid => deletePage(cid))
 
-const deletePage = (id) => db.prepare('DELETE FROM pages WHERE id = ?').run(id)
+  store.pages = store.pages.filter(p => p.id !== id)
+  delete store.page_content[id]
+  store.db_columns = store.db_columns.filter(c => c.page_id !== id)
+  store.db_rows = store.db_rows.filter(r => r.page_id !== id)
+  store.finance_entries = store.finance_entries.filter(e => e.page_id !== id)
+  store.content_items = store.content_items.filter(c => c.page_id !== id)
+  saveStore()
+}
 
 // ── Page content ───────────────────────────────────────────────────────────
 
-const getContent = (pageId) => {
-  const row = db.prepare('SELECT content FROM page_content WHERE page_id = ?').get(pageId)
-  return row ? JSON.parse(row.content) : []
+function getContent(pageId) {
+  return store.page_content[pageId] || []
 }
 
-const saveContent = (pageId, content) => {
-  db.prepare(`
-    INSERT INTO page_content (page_id, content) VALUES (?, ?)
-    ON CONFLICT(page_id) DO UPDATE SET content = excluded.content
-  `).run(pageId, JSON.stringify(content))
+function saveContent(pageId, content) {
+  store.page_content[pageId] = content
+  saveStore()
+}
+
+function getContentByKey(key) {
+  return store.page_content[key] || []
+}
+
+function saveContentByKey(key, content) {
+  store.page_content[key] = content
+  saveStore()
 }
 
 // ── Database view ──────────────────────────────────────────────────────────
 
-const getDbColumns = (pageId) =>
-  db.prepare('SELECT * FROM db_columns WHERE page_id = ? ORDER BY order_index').all(pageId)
-
-const addDbColumn = (pageId, name, colType = 'text') => {
-  const count = db.prepare('SELECT COUNT(*) as c FROM db_columns WHERE page_id = ?').get(pageId).c
-  const result = db.prepare(
-    'INSERT INTO db_columns (page_id, name, col_type, order_index) VALUES (?, ?, ?, ?)'
-  ).run(pageId, name, colType, count)
-  return result.lastInsertRowid
+function getDbColumns(pageId) {
+  return store.db_columns
+    .filter(c => c.page_id === pageId)
+    .sort((a, b) => a.order_index - b.order_index)
 }
 
-const deleteDbColumn = (id) => db.prepare('DELETE FROM db_columns WHERE id = ?').run(id)
-const renameDbColumn = (id, name) => db.prepare('UPDATE db_columns SET name = ? WHERE id = ?').run(name, id)
-
-const getDbRows = (pageId) => {
-  const rows = db.prepare('SELECT * FROM db_rows WHERE page_id = ? ORDER BY id').all(pageId)
-  return rows.map(r => ({ ...r, row_data: JSON.parse(r.row_data || '{}') }))
+function addDbColumn(pageId, name, colType = 'text') {
+  const count = store.db_columns.filter(c => c.page_id === pageId).length
+  const col = { id: nextId('db_columns'), page_id: pageId, name, col_type: colType, order_index: count }
+  store.db_columns.push(col)
+  saveStore()
+  return col.id
 }
 
-const addDbRow = (pageId) =>
-  db.prepare("INSERT INTO db_rows (page_id, row_data) VALUES (?, '{}')").run(pageId).lastInsertRowid
+function deleteDbColumn(id) {
+  store.db_columns = store.db_columns.filter(c => c.id !== id)
+  saveStore()
+}
 
-const updateDbRow = (id, rowData) =>
-  db.prepare('UPDATE db_rows SET row_data = ? WHERE id = ?').run(JSON.stringify(rowData), id)
+function renameDbColumn(id, name) {
+  const col = store.db_columns.find(c => c.id === id)
+  if (col) { col.name = name; saveStore() }
+}
 
-const deleteDbRow = (id) => db.prepare('DELETE FROM db_rows WHERE id = ?').run(id)
+function getDbRows(pageId) {
+  return store.db_rows.filter(r => r.page_id === pageId).sort((a, b) => a.id - b.id)
+}
+
+function addDbRow(pageId) {
+  const row = { id: nextId('db_rows'), page_id: pageId, row_data: {}, created_at: new Date().toISOString() }
+  store.db_rows.push(row)
+  saveStore()
+  return row.id
+}
+
+function updateDbRow(id, rowData) {
+  const row = store.db_rows.find(r => r.id === id)
+  if (row) { row.row_data = rowData; saveStore() }
+}
+
+function deleteDbRow(id) {
+  store.db_rows = store.db_rows.filter(r => r.id !== id)
+  saveStore()
+}
 
 // ── Calendar ────────────────────────────────────────────────────────────────
 
-const getEvents = (year, month) => {
-  const prefix = `${year}-${String(month).padStart(2, '0')}-`
-  return db.prepare("SELECT * FROM calendar_events WHERE event_date LIKE ?").all(prefix + '%')
+// Get events in a date range, including recurring event occurrences
+function getEventsInRange(startDate, endDate) {
+  const result = []
+  store.calendar_events.forEach(ev => {
+    const recurring = ev.recurring || 'yok'
+    if (recurring === 'yok') {
+      if (ev.event_date >= startDate && ev.event_date <= endDate) {
+        result.push({ ...ev })
+      }
+    } else if (recurring === 'haftalık') {
+      const days = ev.recurring_days || []
+      const cur = new Date(startDate + 'T00:00:00')
+      const end = new Date(endDate + 'T00:00:00')
+      while (cur <= end) {
+        const dow = (cur.getDay() + 6) % 7 // Mon=0
+        if (days.includes(dow)) {
+          const d = cur.getFullYear() + '-'
+            + String(cur.getMonth() + 1).padStart(2, '0') + '-'
+            + String(cur.getDate()).padStart(2, '0')
+          result.push({ ...ev, event_date: d, _is_occurrence: true })
+        }
+        cur.setDate(cur.getDate() + 1)
+      }
+    }
+  })
+  return result
 }
 
-const addEvent = (title, eventDate, color = '#2eaadc', note = '') =>
-  db.prepare('INSERT INTO calendar_events (title, event_date, color, note) VALUES (?, ?, ?, ?)')
-    .run(title, eventDate, color, note).lastInsertRowid
+function getEvents(year, month) {
+  const startDate = `${year}-${String(month).padStart(2, '0')}-01`
+  const lastDay = new Date(year, month, 0).getDate()
+  const endDate = `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  return getEventsInRange(startDate, endDate)
+}
 
-const deleteEvent = (id) => db.prepare('DELETE FROM calendar_events WHERE id = ?').run(id)
+function addEvent(title, eventDate, color = '#2eaadc', note = '', startTime = '', endTime = '', allDay = true, recurring = 'yok', recurringDays = []) {
+  const ev = {
+    id: nextId('calendar_events'),
+    title, event_date: eventDate, color, note,
+    start_time: startTime, end_time: endTime, all_day: allDay,
+    recurring, recurring_days: recurringDays,
+  }
+  store.calendar_events.push(ev)
+  saveStore()
+  return ev.id
+}
 
-const updateEvent = (id, fields) => {
-  const sets = Object.keys(fields).map(k => `${k} = ?`).join(', ')
-  db.prepare(`UPDATE calendar_events SET ${sets} WHERE id = ?`).run(...Object.values(fields), id)
+function deleteEvent(id) {
+  store.calendar_events = store.calendar_events.filter(e => e.id !== id)
+  saveStore()
+}
+
+function updateEvent(id, fields) {
+  const ev = store.calendar_events.find(e => e.id === id)
+  if (ev) { Object.assign(ev, fields); saveStore() }
+}
+
+// ── Finance ────────────────────────────────────────────────────────────────
+
+function getFinanceEntries(pageId) {
+  return store.finance_entries
+    .filter(e => e.page_id === pageId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id - a.id)
+}
+
+function addFinanceEntry(pageId, title, amount, type, category, date, note, recurring) {
+  const entry = {
+    id: nextId('finance_entries'),
+    page_id: pageId,
+    title, amount, type, category, date, note, recurring,
+    calendar_event_id: null,
+    created_at: new Date().toISOString(),
+  }
+  if (date) {
+    const label = type === 'gelir' ? `💰 ${title} (+${amount}₺)` : `💸 ${title} (-${amount}₺)`
+    const color = type === 'gelir' ? '#0f7b6c' : '#e03e3e'
+    const evId = nextId('calendar_events')
+    store.calendar_events.push({ id: evId, title: label, event_date: date, color, note: note || '', start_time: '', end_time: '', all_day: true, recurring: 'yok', recurring_days: [] })
+    entry.calendar_event_id = evId
+  }
+  store.finance_entries.push(entry)
+  saveStore()
+  return entry.id
+}
+
+function updateFinanceEntry(id, fields) {
+  const entry = store.finance_entries.find(e => e.id === id)
+  if (!entry) return
+  const prevDate = entry.date
+  Object.assign(entry, fields)
+  if (entry.calendar_event_id) {
+    const ev = store.calendar_events.find(e => e.id === entry.calendar_event_id)
+    if (ev) {
+      ev.event_date = entry.date || ev.event_date
+      ev.title = entry.type === 'gelir'
+        ? `💰 ${entry.title} (+${entry.amount}₺)`
+        : `💸 ${entry.title} (-${entry.amount}₺)`
+      ev.color = entry.type === 'gelir' ? '#0f7b6c' : '#e03e3e'
+      if (!entry.date) {
+        store.calendar_events = store.calendar_events.filter(e => e.id !== entry.calendar_event_id)
+        entry.calendar_event_id = null
+      }
+    }
+  } else if (entry.date && entry.date !== prevDate) {
+    const label = entry.type === 'gelir' ? `💰 ${entry.title} (+${entry.amount}₺)` : `💸 ${entry.title} (-${entry.amount}₺)`
+    const color = entry.type === 'gelir' ? '#0f7b6c' : '#e03e3e'
+    const evId = nextId('calendar_events')
+    store.calendar_events.push({ id: evId, title: label, event_date: entry.date, color, note: entry.note || '', start_time: '', end_time: '', all_day: true, recurring: 'yok', recurring_days: [] })
+    entry.calendar_event_id = evId
+  }
+  saveStore()
+}
+
+function deleteFinanceEntry(id) {
+  const entry = store.finance_entries.find(e => e.id === id)
+  if (entry && entry.calendar_event_id) {
+    store.calendar_events = store.calendar_events.filter(e => e.id !== entry.calendar_event_id)
+  }
+  store.finance_entries = store.finance_entries.filter(e => e.id !== id)
+  saveStore()
+}
+
+// ── Content Items ──────────────────────────────────────────────────────────
+
+function getContentItems(pageId) {
+  return store.content_items
+    .filter(c => c.page_id === pageId)
+    .sort((a, b) => a.id - b.id)
+}
+
+function addContentItem(pageId, title, platform, contentType, status, scheduledDate, description, thumbnailPath, tags) {
+  const item = {
+    id: nextId('content_items'),
+    page_id: pageId,
+    title, platform, content_type: contentType, status,
+    scheduled_date: scheduledDate, description, thumbnail_path: thumbnailPath, tags,
+    calendar_event_id: null,
+    created_at: new Date().toISOString(),
+  }
+  if (scheduledDate) {
+    const emoji = contentType === 'video' ? '🎬' : contentType === 'fotoğraf' ? '📸' : '📱'
+    const evId = nextId('calendar_events')
+    store.calendar_events.push({ id: evId, title: `${emoji} ${title} (${platform})`, event_date: scheduledDate, color: '#9065b0', note: description || '', start_time: '', end_time: '', all_day: true, recurring: 'yok', recurring_days: [] })
+    item.calendar_event_id = evId
+  }
+  store.content_items.push(item)
+  saveStore()
+  return item.id
+}
+
+function updateContentItem(id, fields) {
+  const item = store.content_items.find(c => c.id === id)
+  if (!item) return
+  const prevDate = item.scheduled_date
+  Object.assign(item, fields)
+  if (item.calendar_event_id) {
+    const ev = store.calendar_events.find(e => e.id === item.calendar_event_id)
+    if (ev) {
+      if (!item.scheduled_date) {
+        store.calendar_events = store.calendar_events.filter(e => e.id !== item.calendar_event_id)
+        item.calendar_event_id = null
+      } else {
+        ev.event_date = item.scheduled_date
+        const emoji = item.content_type === 'video' ? '🎬' : item.content_type === 'fotoğraf' ? '📸' : '📱'
+        ev.title = `${emoji} ${item.title} (${item.platform})`
+      }
+    }
+  } else if (item.scheduled_date && item.scheduled_date !== prevDate) {
+    const emoji = item.content_type === 'video' ? '🎬' : item.content_type === 'fotoğraf' ? '📸' : '📱'
+    const evId = nextId('calendar_events')
+    store.calendar_events.push({ id: evId, title: `${emoji} ${item.title} (${item.platform})`, event_date: item.scheduled_date, color: '#9065b0', note: item.description || '', start_time: '', end_time: '', all_day: true, recurring: 'yok', recurring_days: [] })
+    item.calendar_event_id = evId
+  }
+  saveStore()
+}
+
+function deleteContentItem(id) {
+  const item = store.content_items.find(c => c.id === id)
+  if (item && item.calendar_event_id) {
+    store.calendar_events = store.calendar_events.filter(e => e.id !== item.calendar_event_id)
+  }
+  store.content_items = store.content_items.filter(c => c.id !== id)
+  saveStore()
+}
+
+// ── Sidebar Categories ──────────────────────────────────────────────────────
+
+function getCategories() {
+  return [...store.sidebar_categories].sort((a, b) => (a.order || 0) - (b.order || 0))
+}
+
+function createCategory(name) {
+  const cat = {
+    id: nextId('sidebar_categories'),
+    name,
+    order: store.sidebar_categories.length,
+    created_at: new Date().toISOString(),
+  }
+  store.sidebar_categories.push(cat)
+  saveStore()
+  return cat.id
+}
+
+function updateCategory(id, fields) {
+  const cat = store.sidebar_categories.find(c => c.id === id)
+  if (cat) { Object.assign(cat, fields); saveStore() }
+}
+
+function deleteCategory(id) {
+  store.pages.forEach(p => { if (p.category_id === id) p.category_id = null })
+  store.sidebar_categories = store.sidebar_categories.filter(c => c.id !== id)
+  saveStore()
+}
+
+function reorderPages(pageIds) {
+  pageIds.forEach((id, idx) => {
+    const page = store.pages.find(p => p.id === id)
+    if (page) page.order_index = idx
+  })
+  saveStore()
+}
+
+function reorderCategories(catIds) {
+  catIds.forEach((id, idx) => {
+    const cat = store.sidebar_categories.find(c => c.id === id)
+    if (cat) cat.order = idx
+  })
+  saveStore()
 }
 
 module.exports = {
   getPages, getAllPages, getPage, createPage, updatePage, deletePage,
-  getContent, saveContent,
+  getContent, saveContent, getContentByKey, saveContentByKey,
   getDbColumns, addDbColumn, deleteDbColumn, renameDbColumn,
   getDbRows, addDbRow, updateDbRow, deleteDbRow,
-  getEvents, addEvent, deleteEvent, updateEvent,
+  getEvents, getEventsInRange, addEvent, deleteEvent, updateEvent,
+  getFinanceEntries, addFinanceEntry, updateFinanceEntry, deleteFinanceEntry,
+  getContentItems, addContentItem, updateContentItem, deleteContentItem,
+  getCategories, createCategory, updateCategory, deleteCategory,
+  reorderPages, reorderCategories,
 }

@@ -5,13 +5,15 @@ contextBridge.exposeInMainWorld('api', {
   getPages: (parentId) => ipcRenderer.invoke('db:getPages', parentId),
   getAllPages: () => ipcRenderer.invoke('db:getAllPages'),
   getPage: (id) => ipcRenderer.invoke('db:getPage', id),
-  createPage: (title, parentId, icon, pageType) => ipcRenderer.invoke('db:createPage', title, parentId, icon, pageType),
+  createPage: (title, parentId, icon, pageType, categoryId) => ipcRenderer.invoke('db:createPage', title, parentId, icon, pageType, categoryId ?? null),
   updatePage: (id, fields) => ipcRenderer.invoke('db:updatePage', id, fields),
   deletePage: (id) => ipcRenderer.invoke('db:deletePage', id),
 
   // Content
   getContent: (pageId) => ipcRenderer.invoke('db:getContent', pageId),
   saveContent: (pageId, content) => ipcRenderer.invoke('db:saveContent', pageId, content),
+  getContentByKey: (key) => ipcRenderer.invoke('db:getContentByKey', key),
+  saveContentByKey: (key, content) => ipcRenderer.invoke('db:saveContentByKey', key, content),
 
   // Database view
   getDbColumns: (pageId) => ipcRenderer.invoke('db:getDbColumns', pageId),
@@ -25,7 +27,31 @@ contextBridge.exposeInMainWorld('api', {
 
   // Calendar
   getEvents: (year, month) => ipcRenderer.invoke('db:getEvents', year, month),
-  addEvent: (title, date, color, note) => ipcRenderer.invoke('db:addEvent', title, date, color, note),
+  getEventsInRange: (start, end) => ipcRenderer.invoke('db:getEventsInRange', start, end),
+  addEvent: (title, date, color, note, startTime, endTime, allDay, recurring, recurringDays) =>
+    ipcRenderer.invoke('db:addEvent', title, date, color, note, startTime, endTime, allDay, recurring, recurringDays),
   deleteEvent: (id) => ipcRenderer.invoke('db:deleteEvent', id),
   updateEvent: (id, fields) => ipcRenderer.invoke('db:updateEvent', id, fields),
+
+  // Finance
+  getFinanceEntries: (pageId) => ipcRenderer.invoke('db:getFinanceEntries', pageId),
+  addFinanceEntry: (pageId, title, amount, type, category, date, note, recurring) =>
+    ipcRenderer.invoke('db:addFinanceEntry', pageId, title, amount, type, category, date, note, recurring),
+  updateFinanceEntry: (id, fields) => ipcRenderer.invoke('db:updateFinanceEntry', id, fields),
+  deleteFinanceEntry: (id) => ipcRenderer.invoke('db:deleteFinanceEntry', id),
+
+  // Content items
+  getContentItems: (pageId) => ipcRenderer.invoke('db:getContentItems', pageId),
+  addContentItem: (pageId, title, platform, contentType, status, scheduledDate, description, thumbnailPath, tags) =>
+    ipcRenderer.invoke('db:addContentItem', pageId, title, platform, contentType, status, scheduledDate, description, thumbnailPath, tags),
+  updateContentItem: (id, fields) => ipcRenderer.invoke('db:updateContentItem', id, fields),
+  deleteContentItem: (id) => ipcRenderer.invoke('db:deleteContentItem', id),
+
+  // Sidebar categories
+  getCategories: () => ipcRenderer.invoke('db:getCategories'),
+  createCategory: (name) => ipcRenderer.invoke('db:createCategory', name),
+  updateCategory: (id, fields) => ipcRenderer.invoke('db:updateCategory', id, fields),
+  deleteCategory: (id) => ipcRenderer.invoke('db:deleteCategory', id),
+  reorderPages: (pageIds) => ipcRenderer.invoke('db:reorderPages', pageIds),
+  reorderCategories: (catIds) => ipcRenderer.invoke('db:reorderCategories', catIds),
 })

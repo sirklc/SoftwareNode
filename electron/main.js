@@ -21,10 +21,16 @@ function createWindow() {
 
   if (isDev) {
     win.loadURL('http://localhost:5173')
-    win.webContents.openDevTools({ mode: 'detach' })
   } else {
     win.loadFile(path.join(__dirname, '../dist/index.html'))
   }
+
+  // F12 ile DevTools aç/kapat
+  win.webContents.on('before-input-event', (_, input) => {
+    if (input.key === 'F12' && input.type === 'keyDown') {
+      win.webContents.toggleDevTools()
+    }
+  })
 }
 
 app.whenReady().then(createWindow)
@@ -36,12 +42,14 @@ app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) creat
 ipcMain.handle('db:getPages',    (_, parentId) => db.getPages(parentId ?? null))
 ipcMain.handle('db:getAllPages', ()             => db.getAllPages())
 ipcMain.handle('db:getPage',    (_, id)        => db.getPage(id))
-ipcMain.handle('db:createPage', (_, title, parentId, icon, pageType) => db.createPage(title, parentId, icon, pageType))
+ipcMain.handle('db:createPage', (_, title, parentId, icon, pageType, categoryId) => db.createPage(title, parentId, icon, pageType, categoryId ?? null))
 ipcMain.handle('db:updatePage', (_, id, fields) => db.updatePage(id, fields))
 ipcMain.handle('db:deletePage', (_, id)        => db.deletePage(id))
 
-ipcMain.handle('db:getContent',  (_, pageId)          => db.getContent(pageId))
-ipcMain.handle('db:saveContent', (_, pageId, content) => db.saveContent(pageId, content))
+ipcMain.handle('db:getContent',       (_, pageId)          => db.getContent(pageId))
+ipcMain.handle('db:saveContent',      (_, pageId, content) => db.saveContent(pageId, content))
+ipcMain.handle('db:getContentByKey',  (_, key)             => db.getContentByKey(key))
+ipcMain.handle('db:saveContentByKey', (_, key, content)    => db.saveContentByKey(key, content))
 
 ipcMain.handle('db:getDbColumns',   (_, pageId)        => db.getDbColumns(pageId))
 ipcMain.handle('db:addDbColumn',    (_, pageId, name, colType) => db.addDbColumn(pageId, name, colType))
@@ -52,7 +60,25 @@ ipcMain.handle('db:addDbRow',       (_, pageId)        => db.addDbRow(pageId))
 ipcMain.handle('db:updateDbRow',    (_, id, rowData)   => db.updateDbRow(id, rowData))
 ipcMain.handle('db:deleteDbRow',    (_, id)            => db.deleteDbRow(id))
 
-ipcMain.handle('db:getEvents',    (_, year, month)            => db.getEvents(year, month))
-ipcMain.handle('db:addEvent',     (_, title, date, color, note) => db.addEvent(title, date, color, note))
+ipcMain.handle('db:getEvents',        (_, year, month)          => db.getEvents(year, month))
+ipcMain.handle('db:getEventsInRange', (_, start, end)         => db.getEventsInRange(start, end))
+ipcMain.handle('db:addEvent',     (_, title, date, color, note, startTime, endTime, allDay, recurring, recurringDays) => db.addEvent(title, date, color, note, startTime, endTime, allDay, recurring, recurringDays))
 ipcMain.handle('db:deleteEvent',  (_, id)                    => db.deleteEvent(id))
 ipcMain.handle('db:updateEvent',  (_, id, fields)            => db.updateEvent(id, fields))
+
+ipcMain.handle('db:getFinanceEntries',  (_, pageId)                                           => db.getFinanceEntries(pageId))
+ipcMain.handle('db:addFinanceEntry',    (_, pageId, title, amount, type, category, date, note, recurring) => db.addFinanceEntry(pageId, title, amount, type, category, date, note, recurring))
+ipcMain.handle('db:updateFinanceEntry', (_, id, fields)                                       => db.updateFinanceEntry(id, fields))
+ipcMain.handle('db:deleteFinanceEntry', (_, id)                                               => db.deleteFinanceEntry(id))
+
+ipcMain.handle('db:getContentItems',  (_, pageId)                                                                    => db.getContentItems(pageId))
+ipcMain.handle('db:addContentItem',   (_, pageId, title, platform, contentType, status, scheduledDate, description, thumbnailPath, tags) => db.addContentItem(pageId, title, platform, contentType, status, scheduledDate, description, thumbnailPath, tags))
+ipcMain.handle('db:updateContentItem', (_, id, fields)                                                               => db.updateContentItem(id, fields))
+ipcMain.handle('db:deleteContentItem', (_, id)                                                                        => db.deleteContentItem(id))
+
+ipcMain.handle('db:getCategories',      ()              => db.getCategories())
+ipcMain.handle('db:createCategory',    (_, name)       => db.createCategory(name))
+ipcMain.handle('db:updateCategory',    (_, id, fields) => db.updateCategory(id, fields))
+ipcMain.handle('db:deleteCategory',    (_, id)         => db.deleteCategory(id))
+ipcMain.handle('db:reorderPages',      (_, pageIds)    => db.reorderPages(pageIds))
+ipcMain.handle('db:reorderCategories', (_, catIds)     => db.reorderCategories(catIds))

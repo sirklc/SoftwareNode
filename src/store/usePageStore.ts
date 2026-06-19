@@ -8,6 +8,7 @@ interface PageStore {
   sidebarWidth: number
   loadPages: () => Promise<void>
   selectPage: (id: number, type: string) => void
+  selectGlobalCalendar: () => void
   setSidebarWidth: (w: number) => void
 }
 
@@ -23,5 +24,6 @@ export const usePageStore = create<PageStore>((set) => ({
   },
 
   selectPage: (id, type) => set({ selectedPageId: id, selectedPageType: type }),
+  selectGlobalCalendar: () => set({ selectedPageId: null, selectedPageType: 'calendar' }),
   setSidebarWidth: (w) => set({ sidebarWidth: w }),
 }))
