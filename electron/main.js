@@ -82,3 +82,13 @@ ipcMain.handle('db:updateCategory',    (_, id, fields) => db.updateCategory(id, 
 ipcMain.handle('db:deleteCategory',    (_, id)         => db.deleteCategory(id))
 ipcMain.handle('db:reorderPages',      (_, pageIds)    => db.reorderPages(pageIds))
 ipcMain.handle('db:reorderCategories', (_, catIds)     => db.reorderCategories(catIds))
+
+ipcMain.handle('db:getTasks',    ()                          => db.getTasks())
+ipcMain.handle('db:createTask',  (_, title, dueDate, cat)   => db.createTask(title, dueDate, cat))
+ipcMain.handle('db:updateTask',  (_, id, fields)            => db.updateTask(id, fields))
+ipcMain.handle('db:deleteTask',  (_, id)                    => db.deleteTask(id))
+
+ipcMain.handle('db:getBooks',    ()                                              => db.getBooks())
+ipcMain.handle('db:createBook',  (_, title, author, status, totalPages, color)  => db.createBook(title, author, status, totalPages, color))
+ipcMain.handle('db:updateBook',  (_, id, fields)                                => db.updateBook(id, fields))
+ipcMain.handle('db:deleteBook',  (_, id)                                        => db.deleteBook(id))

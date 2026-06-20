@@ -60,6 +60,27 @@ export interface FinanceEntry {
   created_at: string
 }
 
+export interface Book {
+  id: number
+  title: string
+  author: string
+  status: 'okunacak' | 'okunuyor' | 'okundu'
+  total_pages: number
+  current_page: number
+  rating: number
+  cover_color: string
+  created_at: string
+}
+
+export interface Task {
+  id: number
+  title: string
+  due_date: string | null
+  category: string
+  status: 'todo' | 'done'
+  created_at: string
+}
+
 export interface ContentItem {
   id: number
   page_id: number
@@ -121,6 +142,16 @@ declare global {
       deleteCategory: (id: number) => Promise<void>
       reorderPages: (pageIds: number[]) => Promise<void>
       reorderCategories: (catIds: number[]) => Promise<void>
+
+      getTasks: () => Promise<Task[]>
+      createTask: (title: string, dueDate: string | null, category: string) => Promise<number>
+      updateTask: (id: number, fields: Partial<Task>) => Promise<void>
+      deleteTask: (id: number) => Promise<void>
+
+      getBooks: () => Promise<Book[]>
+      createBook: (title: string, author: string, status: string, totalPages: number, color: string) => Promise<number>
+      updateBook: (id: number, fields: Partial<Book>) => Promise<void>
+      deleteBook: (id: number) => Promise<void>
     }
   }
 }

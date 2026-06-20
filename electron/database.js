@@ -27,6 +27,8 @@ let store = loadStore()
 if (!store.finance_entries) store.finance_entries = []
 if (!store.content_items) store.content_items = []
 if (!store.sidebar_categories) store.sidebar_categories = []
+if (!store.tasks) store.tasks = []
+if (!store.books) store.books = []
 
 function nextId(table) {
   store._seq[table] = (store._seq[table] || 0) + 1
@@ -158,27 +160,57 @@ function deleteDbRow(id) {
 // ── Calendar ────────────────────────────────────────────────────────────────
 
 // Get events in a date range, including recurring event occurrences
+function fmtDate(d) {
+  return d.getFullYear() + '-'
+    + String(d.getMonth() + 1).padStart(2, '0') + '-'
+    + String(d.getDate()).padStart(2, '0')
+}
+
 function getEventsInRange(startDate, endDate) {
   const result = []
   store.calendar_events.forEach(ev => {
     const recurring = ev.recurring || 'yok'
+    const origDate = new Date(ev.event_date + 'T00:00:00')
+    const startD  = new Date(startDate + 'T00:00:00')
+    const endD    = new Date(endDate + 'T00:00:00')
+
     if (recurring === 'yok') {
       if (ev.event_date >= startDate && ev.event_date <= endDate) {
         result.push({ ...ev })
       }
     } else if (recurring === 'haftalık') {
       const days = ev.recurring_days || []
-      const cur = new Date(startDate + 'T00:00:00')
-      const end = new Date(endDate + 'T00:00:00')
-      while (cur <= end) {
-        const dow = (cur.getDay() + 6) % 7 // Mon=0
-        if (days.includes(dow)) {
-          const d = cur.getFullYear() + '-'
-            + String(cur.getMonth() + 1).padStart(2, '0') + '-'
-            + String(cur.getDate()).padStart(2, '0')
-          result.push({ ...ev, event_date: d, _is_occurrence: true })
+      const cur = new Date(startD)
+      while (cur <= endD) {
+        if (cur >= origDate) {
+          const dow = (cur.getDay() + 6) % 7
+          if (days.includes(dow)) {
+            result.push({ ...ev, event_date: fmtDate(cur), _is_occurrence: true })
+          }
         }
         cur.setDate(cur.getDate() + 1)
+      }
+    } else if (recurring === 'aylık') {
+      const dayOfMonth = origDate.getDate()
+      // Walk month by month across the range
+      let cur = new Date(startD.getFullYear(), startD.getMonth(), 1)
+      while (cur <= endD) {
+        const lastDay = new Date(cur.getFullYear(), cur.getMonth() + 1, 0).getDate()
+        const day = Math.min(dayOfMonth, lastDay)
+        const occ = new Date(cur.getFullYear(), cur.getMonth(), day)
+        if (occ >= origDate && occ >= startD && occ <= endD) {
+          result.push({ ...ev, event_date: fmtDate(occ), _is_occurrence: fmtDate(occ) !== ev.event_date })
+        }
+        cur.setMonth(cur.getMonth() + 1)
+      }
+    } else if (recurring === 'yıllık') {
+      const mo  = origDate.getMonth()
+      const day = origDate.getDate()
+      for (let y = startD.getFullYear(); y <= endD.getFullYear(); y++) {
+        const occ = new Date(y, mo, day)
+        if (occ >= origDate && occ >= startD && occ <= endD) {
+          result.push({ ...ev, event_date: fmtDate(occ), _is_occurrence: fmtDate(occ) !== ev.event_date })
+        }
       }
     }
   })
@@ -233,8 +265,17 @@ function addFinanceEntry(pageId, title, amount, type, category, date, note, recu
   if (date) {
     const label = type === 'gelir' ? `💰 ${title} (+${amount}₺)` : `💸 ${title} (-${amount}₺)`
     const color = type === 'gelir' ? '#0f7b6c' : '#e03e3e'
+    let calRecurring = 'yok'
+    let calRecurringDays = []
+    if (recurring === 'haftalık') {
+      calRecurring = 'haftalık'
+      const dow = (new Date(date + 'T00:00:00').getDay() + 6) % 7
+      calRecurringDays = [dow]
+    } else if (recurring === 'aylık' || recurring === 'yıllık') {
+      calRecurring = recurring
+    }
     const evId = nextId('calendar_events')
-    store.calendar_events.push({ id: evId, title: label, event_date: date, color, note: note || '', start_time: '', end_time: '', all_day: true, recurring: 'yok', recurring_days: [] })
+    store.calendar_events.push({ id: evId, title: label, event_date: date, color, note: note || '', start_time: '', end_time: '', all_day: true, recurring: calRecurring, recurring_days: calRecurringDays })
     entry.calendar_event_id = evId
   }
   store.finance_entries.push(entry)
@@ -387,6 +428,42 @@ function reorderCategories(catIds) {
   saveStore()
 }
 
+// ── Tasks ──────────────────────────────────────────────────────────────────
+
+function getTasks() {
+  return [...store.tasks].sort((a, b) => {
+    if (a.status !== b.status) return a.status === 'done' ? 1 : -1
+    if (a.due_date && b.due_date) return a.due_date.localeCompare(b.due_date)
+    if (a.due_date) return -1
+    if (b.due_date) return 1
+    return a.id - b.id
+  })
+}
+
+function createTask(title, dueDate = null, category = 'Genel') {
+  const task = {
+    id: nextId('tasks'),
+    title,
+    due_date: dueDate,
+    category,
+    status: 'todo',
+    created_at: new Date().toISOString(),
+  }
+  store.tasks.push(task)
+  saveStore()
+  return task.id
+}
+
+function updateTask(id, fields) {
+  const task = store.tasks.find(t => t.id === id)
+  if (task) { Object.assign(task, fields); saveStore() }
+}
+
+function deleteTask(id) {
+  store.tasks = store.tasks.filter(t => t.id !== id)
+  saveStore()
+}
+
 module.exports = {
   getPages, getAllPages, getPage, createPage, updatePage, deletePage,
   getContent, saveContent, getContentByKey, saveContentByKey,
@@ -397,4 +474,37 @@ module.exports = {
   getContentItems, addContentItem, updateContentItem, deleteContentItem,
   getCategories, createCategory, updateCategory, deleteCategory,
   reorderPages, reorderCategories,
+  getTasks, createTask, updateTask, deleteTask,
+  getBooks, createBook, updateBook, deleteBook,
+}
+
+// ── Books ──────────────────────────────────────────────────────────────────
+
+function getBooks() {
+  return [...store.books].sort((a, b) => a.id - b.id)
+}
+
+function createBook(title, author, status = 'okunacak', totalPages = 0, coverColor = '#2eaadc') {
+  const book = {
+    id: nextId('books'),
+    title, author, status,
+    total_pages: totalPages,
+    current_page: 0,
+    rating: 0,
+    cover_color: coverColor,
+    created_at: new Date().toISOString(),
+  }
+  store.books.push(book)
+  saveStore()
+  return book.id
+}
+
+function updateBook(id, fields) {
+  const book = store.books.find(b => b.id === id)
+  if (book) { Object.assign(book, fields); saveStore() }
+}
+
+function deleteBook(id) {
+  store.books = store.books.filter(b => b.id !== id)
+  saveStore()
 }

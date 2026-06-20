@@ -196,8 +196,17 @@ function EventModal({ modal, onClose, onSave, onDelete }: EventModalProps) {
             >
               <option value="yok">Tekrar Yok</option>
               <option value="haftalık">Her Hafta (seçili günler)</option>
+              <option value="aylık">Her Ay (aynı gün)</option>
+              <option value="yıllık">Her Yıl (aynı tarih)</option>
             </select>
           </div>
+
+          {form.recurring === 'aylık' && (
+            <p className="text-[11px] text-[#9b9a97] pl-5">Her ay {modal.date ? new Date(modal.date + 'T00:00:00').getDate() + ". günde" : "aynı günde"} tekrarlanır</p>
+          )}
+          {form.recurring === 'yıllık' && (
+            <p className="text-[11px] text-[#9b9a97] pl-5">Her yıl aynı tarihte tekrarlanır</p>
+          )}
 
           {/* Weekly day selector */}
           {form.recurring === 'haftalık' && (

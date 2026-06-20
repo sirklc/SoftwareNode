@@ -1,10 +1,67 @@
 import React, { useState, useRef, useEffect, createContext, useContext } from 'react'
+import ReactDOM from 'react-dom'
 import {
   FileText, Database, Calendar, ChevronRight, ChevronDown,
-  Plus, Trash2, Edit2, MoreHorizontal, Search, DollarSign, Film, Folder, GripVertical
+  Plus, Trash2, Edit2, MoreHorizontal, Search, DollarSign, Film, Folder, GripVertical, Home,
+  BookOpen, CheckSquare, X,
 } from 'lucide-react'
 import { Page, SidebarCategory } from '../types'
 import { usePageStore } from '../store/usePageStore'
+
+// ── Search Modal ───────────────────────────────────────────────────────────────
+
+function SearchModal({ onClose }: { onClose: () => void }) {
+  const { pages, selectPage } = usePageStore()
+  const [query, setQuery] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { inputRef.current?.focus() }, [])
+
+  const results = query.trim()
+    ? pages.filter(p => p.title.toLowerCase().includes(query.toLowerCase()))
+    : pages.slice(0, 8)
+
+  const PAGE_TYPE_ICON: Record<string, React.ReactNode> = {
+    note:     <FileText size={14} className="text-[#9b9a97]" />,
+    database: <Database size={14} className="text-[#9b9a97]" />,
+    finance:  <DollarSign size={14} className="text-[#9b9a97]" />,
+    content:  <Film size={14} className="text-[#9b9a97]" />,
+    group:    <Folder size={14} className="text-[#9b9a97]" />,
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-24 bg-black/30 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-white rounded-2xl shadow-2xl w-[520px] overflow-hidden" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-[#e9e9e7]">
+          <Search size={16} className="text-[#9b9a97] flex-shrink-0" />
+          <input
+            ref={inputRef}
+            placeholder="Sayfa ara..."
+            className="flex-1 text-[14px] text-[#37352f] outline-none placeholder:text-[#9b9a97]"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            onKeyDown={e => e.key === 'Escape' && onClose()}
+          />
+          <button onClick={onClose} className="text-[#9b9a97] hover:text-[#37352f]"><X size={14} /></button>
+        </div>
+        <div className="max-h-80 overflow-y-auto py-1">
+          {results.length === 0 ? (
+            <p className="text-[13px] text-[#9b9a97] text-center py-6">Sonuç bulunamadı</p>
+          ) : results.map(p => (
+            <button
+              key={p.id}
+              onClick={() => { selectPage(p.id, p.page_type); onClose() }}
+              className="flex items-center gap-3 w-full px-4 py-2.5 hover:bg-[#f7f7f5] text-left transition-colors"
+            >
+              <span className="flex-shrink-0">{p.icon || PAGE_TYPE_ICON[p.page_type]}</span>
+              <span className="text-[13.5px] text-[#37352f] flex-1 truncate">{p.title || 'Başlıksız'}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -50,6 +107,44 @@ const ADD_MENU_ITEMS = [
   { type: 'group',    icon: <Folder size={13} />,     label: 'Yeni Grup' },
 ]
 
+// ── PortalMenu ────────────────────────────────────────────────────────────────
+// Renders menu into document.body to escape overflow-y:auto clipping in sidebar
+
+function PortalMenu({
+  anchorRef,
+  onClose,
+  children,
+}: {
+  anchorRef: React.RefObject<HTMLElement | HTMLButtonElement | HTMLDivElement>
+  onClose: () => void
+  children: React.ReactNode
+}) {
+  const [pos, setPos] = useState({ top: 0, left: 0 })
+
+  useEffect(() => {
+    if (anchorRef.current) {
+      const r = anchorRef.current.getBoundingClientRect()
+      setPos({ top: r.bottom + 4, left: r.left })
+    }
+    const h = (e: MouseEvent) => {
+      if (anchorRef.current && !anchorRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+
+  return ReactDOM.createPortal(
+    <div
+      className="fixed z-[9999] bg-white border border-[#e9e9e7] rounded-xl shadow-lg py-1 w-52 text-[13px]"
+      style={{ top: pos.top, left: pos.left }}
+      onMouseDown={e => e.stopPropagation()}
+    >
+      {children}
+    </div>,
+    document.body,
+  )
+}
+
 // ── AddDropdown ───────────────────────────────────────────────────────────────
 
 function AddDropdown({ onSelect, onClose }: { onSelect: (type: string) => void; onClose: () => void }) {
@@ -94,23 +189,13 @@ function PageItem({
   const [renaming, setRenaming] = useState(false)
   const [renameVal, setRenameVal] = useState(page.title)
   const [movingOpen, setMovingOpen] = useState(false)
-  const menuRef = useRef<HTMLDivElement>(null)
+  const menuRef = useRef<HTMLButtonElement>(null)
 
   const children = allPages.filter(p => p.parent_id === page.id)
   const hasChildren = children.length > 0
   const isSelected = selectedPageId === page.id
   const isDraggable = depth === 0
   const isDropTarget = drag.dropTargetId === page.id && drag.dropTargetType === 'page'
-
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setMenuOpen(false); setMovingOpen(false)
-      }
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
 
   const handleRename = async () => {
     if (renameVal.trim()) {
@@ -224,57 +309,56 @@ function PageItem({
             >
               <Plus size={12} />
             </button>
-            <div className="relative" ref={menuRef}>
+            <div>
               <button
+                ref={menuRef}
                 className="w-5 h-5 flex items-center justify-center rounded hover:bg-[#e0e0de] text-[#9b9a97]"
                 onClick={() => { setMenuOpen(!menuOpen); setMovingOpen(false) }}
               >
                 <MoreHorizontal size={12} />
               </button>
               {menuOpen && (
-                <div className="absolute left-0 top-6 z-50 bg-white border border-[#e9e9e7] rounded-xl shadow-lg py-1 w-52 text-[13px]">
-                  <button className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center gap-2"
+                <PortalMenu anchorRef={menuRef} onClose={() => { setMenuOpen(false); setMovingOpen(false) }}>
+                  <button className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center gap-2 text-[#37352f]"
                     onClick={() => { setRenaming(true); setRenameVal(page.title); setMenuOpen(false) }}>
                     <Edit2 size={13} /> Yeniden Adlandır
                   </button>
                   {isRootPage && categories.length > 0 && (
                     <>
                       <div className="border-t border-[#e9e9e7] my-1" />
-                      <div className="relative">
-                        <button
-                          className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center justify-between gap-2"
-                          onClick={() => setMovingOpen(v => !v)}
-                        >
-                          <span className="flex items-center gap-2"><Folder size={13} /> Kategoriye Taşı</span>
-                          <ChevronRight size={11} className="text-[#9b9a97]" />
-                        </button>
-                        {movingOpen && (
-                          <div className="absolute left-full top-0 ml-1 z-50 bg-white border border-[#e9e9e7] rounded-xl shadow-lg py-1 w-44 text-[13px]">
+                      <button
+                        className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center justify-between gap-2 text-[#37352f]"
+                        onClick={() => setMovingOpen(v => !v)}
+                      >
+                        <span className="flex items-center gap-2"><Folder size={13} /> Kategoriye Taşı</span>
+                        <ChevronRight size={11} className="text-[#9b9a97]" />
+                      </button>
+                      {movingOpen && (
+                        <div className="border-t border-[#e9e9e7] my-1 mx-2 pb-1">
+                          <button
+                            className={`w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] rounded text-[#37352f] ${page.category_id === null ? 'font-semibold' : ''}`}
+                            onClick={() => handleMoveToCategory(null)}
+                          >
+                            Kategorisiz
+                          </button>
+                          <div className="border-t border-[#e9e9e7] my-1" />
+                          {categories.map(cat => (
                             <button
-                              className={`w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] ${page.category_id === null ? 'font-semibold' : ''}`}
-                              onClick={() => handleMoveToCategory(null)}
+                              key={cat.id}
+                              className={`w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] rounded text-[#37352f] ${page.category_id === cat.id ? 'font-semibold' : ''}`}
+                              onClick={() => handleMoveToCategory(cat.id)}
                             >
-                              Kategorisiz
+                              {cat.name}
                             </button>
-                            <div className="border-t border-[#e9e9e7] my-1" />
-                            {categories.map(cat => (
-                              <button
-                                key={cat.id}
-                                className={`w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] ${page.category_id === cat.id ? 'font-semibold' : ''}`}
-                                onClick={() => handleMoveToCategory(cat.id)}
-                              >
-                                {cat.name}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </>
                   )}
                   <div className="border-t border-[#e9e9e7] my-1" />
                   <p className="px-3 py-1 text-[11px] text-[#9b9a97] font-semibold uppercase tracking-wide">Alt Sayfa Ekle</p>
                   {ADD_MENU_ITEMS.map(item => (
-                    <button key={item.type} className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center gap-2"
+                    <button key={item.type} className="w-full text-left px-3 py-1.5 hover:bg-[#f1f1ef] flex items-center gap-2 text-[#37352f]"
                       onClick={() => handleAddChild(item.type)}>
                       {item.icon} {item.label}
                     </button>
@@ -284,7 +368,7 @@ function PageItem({
                     onClick={handleDelete}>
                     <Trash2 size={13} /> Sil
                   </button>
-                </div>
+                </PortalMenu>
               )}
             </div>
           </div>
@@ -526,7 +610,8 @@ function DefaultSection({
 // ── Sidebar ───────────────────────────────────────────────────────────────────
 
 export function Sidebar() {
-  const { pages, loadPages, selectGlobalCalendar, selectedPageId, selectedPageType } = usePageStore()
+  const { pages, loadPages, selectGlobalCalendar, selectHome, selectLibrary, selectTasks, selectedPageId, selectedPageType } = usePageStore()
+  const [searchOpen, setSearchOpen] = useState(false)
   const [categories, setCategories] = useState<SidebarCategory[]>([])
   const [addingCategory, setAddingCategory] = useState(false)
   const [newCatName, setNewCatName] = useState('')
@@ -534,6 +619,9 @@ export function Sidebar() {
   const [dropTargetId, setDropTargetId] = useState<number | null>(null)
   const [dropTargetType, setDropTargetType] = useState<'cat' | 'page' | null>(null)
   const isCalendarActive = selectedPageId === null && selectedPageType === 'calendar'
+  const isHomeActive     = selectedPageId === null && selectedPageType === 'home'
+  const isLibraryActive  = selectedPageId === null && selectedPageType === 'library'
+  const isTasksActive    = selectedPageId === null && selectedPageType === 'tasks'
 
   const loadCategories = async () => {
     const cats = await window.api.getCategories()
@@ -634,6 +722,7 @@ export function Sidebar() {
   }
 
   return (
+    <>
     <DragContext.Provider value={dragCtx}>
       <div className="flex flex-col h-full bg-[#f7f7f5] border-r border-[#e9e9e7] select-none">
         {/* Header */}
@@ -644,8 +733,22 @@ export function Sidebar() {
           <span className="font-semibold text-[14px] text-[#37352f] flex-1 truncate">SoftwareNode</span>
         </div>
 
+        {/* Home */}
+        <button
+          onClick={selectHome}
+          className={`flex items-center gap-2 px-3 py-1.5 mx-1 mt-1 rounded text-[13px] transition-colors ${
+            isHomeActive ? 'bg-[#efefef] text-[#37352f] font-medium' : 'hover:bg-[#efefef] text-[#9b9a97]'
+          }`}
+        >
+          <Home size={13} />
+          <span>Ana Sayfa</span>
+        </button>
+
         {/* Search */}
-        <button className="flex items-center gap-2 px-3 py-1.5 mx-1 mt-1 rounded hover:bg-[#efefef] text-[#9b9a97] text-[13px] transition-colors">
+        <button
+          onClick={() => setSearchOpen(true)}
+          className="flex items-center gap-2 px-3 py-1.5 mx-1 rounded hover:bg-[#efefef] text-[#9b9a97] text-[13px] transition-colors"
+        >
           <Search size={13} />
           <span>Ara</span>
         </button>
@@ -654,13 +757,33 @@ export function Sidebar() {
         <button
           onClick={selectGlobalCalendar}
           className={`flex items-center gap-2 px-3 py-1.5 mx-1 rounded text-[13px] transition-colors ${
-            isCalendarActive
-              ? 'bg-[#efefef] text-[#37352f] font-medium'
-              : 'hover:bg-[#efefef] text-[#9b9a97]'
+            isCalendarActive ? 'bg-[#efefef] text-[#37352f] font-medium' : 'hover:bg-[#efefef] text-[#9b9a97]'
           }`}
         >
           <Calendar size={13} />
           <span>Takvim</span>
+        </button>
+
+        {/* Library */}
+        <button
+          onClick={selectLibrary}
+          className={`flex items-center gap-2 px-3 py-1.5 mx-1 rounded text-[13px] transition-colors ${
+            isLibraryActive ? 'bg-[#efefef] text-[#37352f] font-medium' : 'hover:bg-[#efefef] text-[#9b9a97]'
+          }`}
+        >
+          <BookOpen size={13} />
+          <span>Kütüphane</span>
+        </button>
+
+        {/* Tasks */}
+        <button
+          onClick={selectTasks}
+          className={`flex items-center gap-2 px-3 py-1.5 mx-1 rounded text-[13px] transition-colors ${
+            isTasksActive ? 'bg-[#efefef] text-[#37352f] font-medium' : 'hover:bg-[#efefef] text-[#9b9a97]'
+          }`}
+        >
+          <CheckSquare size={13} />
+          <span>Görevler</span>
         </button>
 
         {/* Page sections */}
@@ -714,5 +837,7 @@ export function Sidebar() {
         </div>
       </div>
     </DragContext.Provider>
+    {searchOpen && <SearchModal onClose={() => setSearchOpen(false)} />}
+    </>
   )
 }

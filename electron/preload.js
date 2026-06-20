@@ -54,4 +54,14 @@ contextBridge.exposeInMainWorld('api', {
   deleteCategory: (id) => ipcRenderer.invoke('db:deleteCategory', id),
   reorderPages: (pageIds) => ipcRenderer.invoke('db:reorderPages', pageIds),
   reorderCategories: (catIds) => ipcRenderer.invoke('db:reorderCategories', catIds),
+
+  getTasks: () => ipcRenderer.invoke('db:getTasks'),
+  createTask: (title, dueDate, category) => ipcRenderer.invoke('db:createTask', title, dueDate, category),
+  updateTask: (id, fields) => ipcRenderer.invoke('db:updateTask', id, fields),
+  deleteTask: (id) => ipcRenderer.invoke('db:deleteTask', id),
+
+  getBooks: () => ipcRenderer.invoke('db:getBooks'),
+  createBook: (title, author, status, totalPages, color) => ipcRenderer.invoke('db:createBook', title, author, status, totalPages, color),
+  updateBook: (id, fields) => ipcRenderer.invoke('db:updateBook', id, fields),
+  deleteBook: (id) => ipcRenderer.invoke('db:deleteBook', id),
 })

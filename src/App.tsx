@@ -6,49 +6,11 @@ import { CalendarView } from './components/CalendarView'
 import { FinanceView } from './components/FinanceView'
 import { ContentView } from './components/ContentView'
 import { GroupView } from './components/GroupView'
+import { Home } from './components/Home'
+import { Library } from './components/Library'
+import { TasksView } from './components/TasksView'
 import { usePageStore } from './store/usePageStore'
 import { Page } from './types'
-
-function WelcomeScreen() {
-  const { loadPages } = usePageStore()
-  const addPage = async (type: string) => {
-    const iconMap: Record<string, string> = {
-      note: '📄', database: '🗃️', calendar: '📅', finance: '💰', content: '🎬', group: '📁'
-    }
-    const id = await window.api.createPage('Başlıksız', null, iconMap[type] || '📄', type)
-    await loadPages()
-    usePageStore.setState({ selectedPageId: id, selectedPageType: type })
-  }
-
-  return (
-    <div className="flex-1 flex flex-col items-center justify-center text-center gap-4">
-      <div className="w-16 h-16 bg-[#37352f] rounded-2xl flex items-center justify-center">
-        <span className="text-white text-3xl font-bold">S</span>
-      </div>
-      <h1 className="text-[32px] font-bold text-[#37352f]">SoftwareNode'a Hoş Geldiniz</h1>
-      <p className="text-[#9b9a97] text-[15px] max-w-sm">
-        Sol paneldeki <strong>+</strong> butonuna tıklayarak yeni bir sayfa oluşturun.
-      </p>
-      <div className="flex flex-wrap gap-2 mt-2 justify-center">
-        {[
-          { type: 'note',     label: '📄 Not' },
-          { type: 'database', label: '🗃️ Veritabanı' },
-          { type: 'finance',  label: '💰 Finans' },
-          { type: 'content',  label: '🎬 İçerik' },
-          { type: 'group',    label: '📁 Grup' },
-        ].map(({ type, label }) => (
-          <button
-            key={type}
-            onClick={() => addPage(type)}
-            className="px-4 py-2 border border-[#e9e9e7] text-[#37352f] rounded-lg text-[14px] hover:bg-[#f1f1ef] transition-colors"
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
 
 export default function App() {
   const { selectedPageId, selectedPageType, sidebarWidth, setSidebarWidth } = usePageStore()
@@ -82,9 +44,11 @@ export default function App() {
   }
 
   const renderContent = () => {
-    // Global calendar (no page needed)
+    if (selectedPageType === 'home' && !selectedPageId) return <Home />
     if (selectedPageType === 'calendar' && !selectedPageId) return <CalendarView />
-    if (!currentPage) return <WelcomeScreen />
+    if (selectedPageType === 'library' && !selectedPageId) return <Library />
+    if (selectedPageType === 'tasks' && !selectedPageId) return <TasksView />
+    if (!currentPage) return <Home />
     switch (selectedPageType) {
       case 'database': return <DatabaseView key={currentPage.id} page={currentPage} />
       case 'finance':  return <FinanceView  key={currentPage.id} page={currentPage} />

@@ -55,3 +55,15 @@ html, body, #root {
 ::selection {
   background: rgba(46,170,220,0.2);
 }
+
+/* Home gradient animation */
+@keyframes gradientShift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.home-gradient {
+  background-size: 300% 300%;
+  animation: gradientShift 12s ease infinite;
+}
