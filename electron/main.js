@@ -92,3 +92,18 @@ ipcMain.handle('db:getBooks',    ()                                             
 ipcMain.handle('db:createBook',  (_, title, author, status, totalPages, color)  => db.createBook(title, author, status, totalPages, color))
 ipcMain.handle('db:updateBook',  (_, id, fields)                                => db.updateBook(id, fields))
 ipcMain.handle('db:deleteBook',  (_, id)                                        => db.deleteBook(id))
+
+ipcMain.handle('db:getDevProjects',   (_, pageId)                                                          => db.getDevProjects(pageId))
+ipcMain.handle('db:addDevProject',    (_, pageId, title, description, status, techStack, githubUrl, priority) => db.addDevProject(pageId, title, description, status, techStack, githubUrl, priority))
+ipcMain.handle('db:updateDevProject', (_, id, fields)                                                      => db.updateDevProject(id, fields))
+ipcMain.handle('db:deleteDevProject', (_, id)                                                              => db.deleteDevProject(id))
+
+ipcMain.handle('db:getDevLogs',   (_, pageId)                              => db.getDevLogs(pageId))
+ipcMain.handle('db:addDevLog',    (_, pageId, date, title, body, tags)    => db.addDevLog(pageId, date, title, body, tags))
+ipcMain.handle('db:updateDevLog', (_, id, fields)                         => db.updateDevLog(id, fields))
+ipcMain.handle('db:deleteDevLog', (_, id)                                 => db.deleteDevLog(id))
+
+ipcMain.handle('db:getDevSnippets',   (_, pageId)                                            => db.getDevSnippets(pageId))
+ipcMain.handle('db:addDevSnippet',    (_, pageId, title, language, code, description, tags)  => db.addDevSnippet(pageId, title, language, code, description, tags))
+ipcMain.handle('db:updateDevSnippet', (_, id, fields)                                        => db.updateDevSnippet(id, fields))
+ipcMain.handle('db:deleteDevSnippet', (_, id)                                                => db.deleteDevSnippet(id))

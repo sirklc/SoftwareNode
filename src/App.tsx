@@ -9,6 +9,7 @@ import { GroupView } from './components/GroupView'
 import { Home } from './components/Home'
 import { Library } from './components/Library'
 import { TasksView } from './components/TasksView'
+import { DevView } from './components/DevView'
 import { usePageStore } from './store/usePageStore'
 import { Page } from './types'
 
@@ -54,6 +55,7 @@ export default function App() {
       case 'finance':  return <FinanceView  key={currentPage.id} page={currentPage} />
       case 'content':  return <ContentView  key={currentPage.id} page={currentPage} />
       case 'group':    return <GroupView    key={currentPage.id} page={currentPage} />
+      case 'dev':      return <DevView      key={currentPage.id} page={currentPage} />
       default:         return <Editor       key={currentPage.id} page={currentPage} />
     }
   }

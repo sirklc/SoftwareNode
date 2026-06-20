@@ -5,9 +5,42 @@ export interface Page {
   category_id: number | null
   icon: string
   cover: string
-  page_type: 'note' | 'database' | 'calendar' | 'finance' | 'content' | 'group'
+  page_type: 'note' | 'database' | 'calendar' | 'finance' | 'content' | 'group' | 'dev'
   created_at: string
   updated_at: string
+}
+
+export interface DevProject {
+  id: number
+  page_id: number
+  title: string
+  description: string
+  status: 'idea' | 'building' | 'done' | 'archived'
+  tech_stack: string
+  github_url: string
+  priority: 'low' | 'medium' | 'high'
+  created_at: string
+}
+
+export interface DevLogEntry {
+  id: number
+  page_id: number
+  date: string
+  title: string
+  body: string
+  tags: string
+  created_at: string
+}
+
+export interface DevSnippet {
+  id: number
+  page_id: number
+  title: string
+  language: string
+  code: string
+  description: string
+  tags: string
+  created_at: string
 }
 
 export interface SidebarCategory {
@@ -152,6 +185,21 @@ declare global {
       createBook: (title: string, author: string, status: string, totalPages: number, color: string) => Promise<number>
       updateBook: (id: number, fields: Partial<Book>) => Promise<void>
       deleteBook: (id: number) => Promise<void>
+
+      getDevProjects: (pageId: number) => Promise<DevProject[]>
+      addDevProject: (pageId: number, title: string, description: string, status: string, techStack: string, githubUrl: string, priority: string) => Promise<number>
+      updateDevProject: (id: number, fields: Partial<DevProject>) => Promise<void>
+      deleteDevProject: (id: number) => Promise<void>
+
+      getDevLogs: (pageId: number) => Promise<DevLogEntry[]>
+      addDevLog: (pageId: number, date: string, title: string, body: string, tags: string) => Promise<number>
+      updateDevLog: (id: number, fields: Partial<DevLogEntry>) => Promise<void>
+      deleteDevLog: (id: number) => Promise<void>
+
+      getDevSnippets: (pageId: number) => Promise<DevSnippet[]>
+      addDevSnippet: (pageId: number, title: string, language: string, code: string, description: string, tags: string) => Promise<number>
+      updateDevSnippet: (id: number, fields: Partial<DevSnippet>) => Promise<void>
+      deleteDevSnippet: (id: number) => Promise<void>
     }
   }
 }

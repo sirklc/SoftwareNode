@@ -64,4 +64,21 @@ contextBridge.exposeInMainWorld('api', {
   createBook: (title, author, status, totalPages, color) => ipcRenderer.invoke('db:createBook', title, author, status, totalPages, color),
   updateBook: (id, fields) => ipcRenderer.invoke('db:updateBook', id, fields),
   deleteBook: (id) => ipcRenderer.invoke('db:deleteBook', id),
+
+  getDevProjects: (pageId) => ipcRenderer.invoke('db:getDevProjects', pageId),
+  addDevProject: (pageId, title, description, status, techStack, githubUrl, priority) =>
+    ipcRenderer.invoke('db:addDevProject', pageId, title, description, status, techStack, githubUrl, priority),
+  updateDevProject: (id, fields) => ipcRenderer.invoke('db:updateDevProject', id, fields),
+  deleteDevProject: (id) => ipcRenderer.invoke('db:deleteDevProject', id),
+
+  getDevLogs: (pageId) => ipcRenderer.invoke('db:getDevLogs', pageId),
+  addDevLog: (pageId, date, title, body, tags) => ipcRenderer.invoke('db:addDevLog', pageId, date, title, body, tags),
+  updateDevLog: (id, fields) => ipcRenderer.invoke('db:updateDevLog', id, fields),
+  deleteDevLog: (id) => ipcRenderer.invoke('db:deleteDevLog', id),
+
+  getDevSnippets: (pageId) => ipcRenderer.invoke('db:getDevSnippets', pageId),
+  addDevSnippet: (pageId, title, language, code, description, tags) =>
+    ipcRenderer.invoke('db:addDevSnippet', pageId, title, language, code, description, tags),
+  updateDevSnippet: (id, fields) => ipcRenderer.invoke('db:updateDevSnippet', id, fields),
+  deleteDevSnippet: (id) => ipcRenderer.invoke('db:deleteDevSnippet', id),
 })

@@ -29,6 +29,9 @@ if (!store.content_items) store.content_items = []
 if (!store.sidebar_categories) store.sidebar_categories = []
 if (!store.tasks) store.tasks = []
 if (!store.books) store.books = []
+if (!store.dev_projects) store.dev_projects = []
+if (!store.dev_logs) store.dev_logs = []
+if (!store.dev_snippets) store.dev_snippets = []
 
 function nextId(table) {
   store._seq[table] = (store._seq[table] || 0) + 1
@@ -476,6 +479,93 @@ module.exports = {
   reorderPages, reorderCategories,
   getTasks, createTask, updateTask, deleteTask,
   getBooks, createBook, updateBook, deleteBook,
+  getDevProjects, addDevProject, updateDevProject, deleteDevProject,
+  getDevLogs, addDevLog, updateDevLog, deleteDevLog,
+  getDevSnippets, addDevSnippet, updateDevSnippet, deleteDevSnippet,
+}
+
+// ── Dev Projects ───────────────────────────────────────────────────────────────
+
+function getDevProjects(pageId) {
+  return store.dev_projects.filter(p => p.page_id === pageId).sort((a, b) => a.id - b.id)
+}
+
+function addDevProject(pageId, title, description = '', status = 'idea', techStack = '', githubUrl = '', priority = 'medium') {
+  const proj = {
+    id: nextId('dev_projects'),
+    page_id: pageId, title, description, status,
+    tech_stack: techStack, github_url: githubUrl, priority,
+    created_at: new Date().toISOString(),
+  }
+  store.dev_projects.push(proj)
+  saveStore()
+  return proj.id
+}
+
+function updateDevProject(id, fields) {
+  const proj = store.dev_projects.find(p => p.id === id)
+  if (proj) { Object.assign(proj, fields); saveStore() }
+}
+
+function deleteDevProject(id) {
+  store.dev_projects = store.dev_projects.filter(p => p.id !== id)
+  saveStore()
+}
+
+// ── Dev Log ────────────────────────────────────────────────────────────────────
+
+function getDevLogs(pageId) {
+  return store.dev_logs
+    .filter(l => l.page_id === pageId)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || b.id - a.id)
+}
+
+function addDevLog(pageId, date, title, body = '', tags = '') {
+  const entry = {
+    id: nextId('dev_logs'),
+    page_id: pageId, date, title, body, tags,
+    created_at: new Date().toISOString(),
+  }
+  store.dev_logs.push(entry)
+  saveStore()
+  return entry.id
+}
+
+function updateDevLog(id, fields) {
+  const entry = store.dev_logs.find(l => l.id === id)
+  if (entry) { Object.assign(entry, fields); saveStore() }
+}
+
+function deleteDevLog(id) {
+  store.dev_logs = store.dev_logs.filter(l => l.id !== id)
+  saveStore()
+}
+
+// ── Dev Snippets ───────────────────────────────────────────────────────────────
+
+function getDevSnippets(pageId) {
+  return store.dev_snippets.filter(s => s.page_id === pageId).sort((a, b) => a.id - b.id)
+}
+
+function addDevSnippet(pageId, title, language, code, description = '', tags = '') {
+  const snippet = {
+    id: nextId('dev_snippets'),
+    page_id: pageId, title, language, code, description, tags,
+    created_at: new Date().toISOString(),
+  }
+  store.dev_snippets.push(snippet)
+  saveStore()
+  return snippet.id
+}
+
+function updateDevSnippet(id, fields) {
+  const snippet = store.dev_snippets.find(s => s.id === id)
+  if (snippet) { Object.assign(snippet, fields); saveStore() }
+}
+
+function deleteDevSnippet(id) {
+  store.dev_snippets = store.dev_snippets.filter(s => s.id !== id)
+  saveStore()
 }
 
 // ── Books ──────────────────────────────────────────────────────────────────

@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom'
 import {
   FileText, Database, Calendar, ChevronRight, ChevronDown,
   Plus, Trash2, Edit2, MoreHorizontal, Search, DollarSign, Film, Folder, GripVertical, Home,
-  BookOpen, CheckSquare, X,
+  BookOpen, CheckSquare, X, Code2,
 } from 'lucide-react'
 import { Page, SidebarCategory } from '../types'
 import { usePageStore } from '../store/usePageStore'
@@ -27,6 +27,7 @@ function SearchModal({ onClose }: { onClose: () => void }) {
     finance:  <DollarSign size={14} className="text-[#9b9a97]" />,
     content:  <Film size={14} className="text-[#9b9a97]" />,
     group:    <Folder size={14} className="text-[#9b9a97]" />,
+    dev:      <Code2 size={14} className="text-[#9b9a97]" />,
   }
 
   return (
@@ -93,10 +94,11 @@ const PAGE_ICONS: Record<string, React.ReactNode> = {
   finance:  <DollarSign size={14} />,
   content:  <Film size={14} />,
   group:    <Folder size={14} />,
+  dev:      <Code2 size={14} />,
 }
 
 const PAGE_TYPE_ICON_STR: Record<string, string> = {
-  note: '📄', database: '🗃️', finance: '💰', content: '🎬', group: '📁'
+  note: '📄', database: '🗃️', finance: '💰', content: '🎬', group: '📁', dev: '💻'
 }
 
 const ADD_MENU_ITEMS = [
@@ -104,6 +106,7 @@ const ADD_MENU_ITEMS = [
   { type: 'database', icon: <Database size={13} />,   label: 'Yeni Veritabanı' },
   { type: 'finance',  icon: <DollarSign size={13} />, label: 'Yeni Finans Takibi' },
   { type: 'content',  icon: <Film size={13} />,       label: 'Yeni İçerik Planı' },
+  { type: 'dev',      icon: <Code2 size={13} />,      label: 'Yeni Dev Sayfası' },
   { type: 'group',    icon: <Folder size={13} />,     label: 'Yeni Grup' },
 ]
 
